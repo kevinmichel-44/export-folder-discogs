@@ -97,6 +97,8 @@ document.querySelectorAll('.btn-download').forEach(btn => {
 
         setTimeout(() => {
             const eventSource = new EventSource('/progress_marketplace');
+            let lastPercent = 0;
+            let isCompleted = false;
 
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);
@@ -118,11 +120,13 @@ document.querySelectorAll('.btn-download').forEach(btn => {
                     current.textContent = data.current;
                     total.textContent = data.total;
                     eta.textContent = data.estimated_time;
+                    lastPercent = data.percent;
                 }
 
                 if (data.status === 'completed') {
                     text.textContent = 'Export ready';
                     fill.style.width = '100%';
+                    isCompleted = true;
                     eventSource.close();
 
                     setTimeout(() => {
@@ -138,6 +142,21 @@ document.querySelectorAll('.btn-download').forEach(btn => {
                     fill.style.background = 'var(--danger)';
                     eventSource.close();
                 }
+            };
+
+            eventSource.onerror = function(error) {
+                // Don't show error if export is still in progress
+                if (!isCompleted && lastPercent > 0 && lastPercent < 100) {
+                    console.log('SSE connection lost, but export may still be running...');
+                    const text = progressContainer.querySelector('.progress-text');
+                    text.textContent = 'Export in progress (connection lost)…';
+                } else if (!isCompleted) {
+                    const text = progressContainer.querySelector('.progress-text');
+                    const fill = progressContainer.querySelector('.progress-fill');
+                    text.textContent = 'Export failed';
+                    fill.style.background = 'var(--danger)';
+                }
+                eventSource.close();
             };
         }, 500);
     });

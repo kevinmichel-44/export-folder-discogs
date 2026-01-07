@@ -27,4 +27,4 @@ ENV FLASK_APP=app.py
 ENV PYTHONUNBUFFERED=1
 
 # Commande de démarrage avec gunicorn pour la production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "600", "app:app"]
