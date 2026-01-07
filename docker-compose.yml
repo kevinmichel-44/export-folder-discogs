@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  discogs-export:
+    image: ghcr.io/optiways/export-folder-discogs:latest
+    container_name: discogs-export
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      # Configuration OAuth Discogs
+      - DISCOGS_CONSUMER_KEY=${DISCOGS_CONSUMER_KEY}
+      - DISCOGS_CONSUMER_SECRET=${DISCOGS_CONSUMER_SECRET}
+      - CALLBACK_URL=${CALLBACK_URL:-http://localhost:5000/callback}
+      - SECRET_KEY=${SECRET_KEY}
+    volumes:
+      # Optionnel : pour persister les données si nécessaire
+      - ./data:/app/data
+    networks:
+      - web
+    labels:
+      # Labels pour Traefik (optionnel)
+      - "traefik.enable=true"
+      - "traefik.http.routers.discogs-export.rule=Host(`discogs.votre-domaine.com`)"
+      - "traefik.http.routers.discogs-export.entrypoints=websecure"
+      - "traefik.http.routers.discogs-export.tls.certresolver=letsencrypt"
+      - "traefik.http.services.discogs-export.loadbalancer.server.port=5000"
+
+networks:
+  web:
+    external: true

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes dossiers - Discogs Export</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Mes dossiers Discogs</h1>
+            <div class="user-info">
+                <span>Connecté en tant que <strong>{{ username }}</strong></span>
+                <a href="{{ url_for('logout') }}" class="btn-secondary">Déconnexion</a>
+            </div>
+        </div>
+        
+        <div class="folders-grid">
+            {% for folder in folders %}
+            <div class="folder-card">
+                <div class="folder-header">
+                    <h2>{{ folder.name }}</h2>
+                    <span class="folder-count">{{ folder.count }} releases</span>
+                </div>
+                <div class="folder-actions">
+                    <a href="{{ url_for('export_folder', folder_id=folder.id) }}" class="btn-primary btn-download">
+                        📥 Télécharger CSV
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        {% if not folders %}
+        <div class="empty-state">
+            <p>Aucun dossier trouvé dans votre collection.</p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <script>
+        // Afficher un message de chargement lors du téléchargement
+        document.querySelectorAll('.btn-download').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                const originalText = this.innerHTML;
+                this.innerHTML = '⏳ Export en cours...';
+                this.classList.add('loading');
+                this.style.pointerEvents = 'none';
+                
+                // Restaurer après 3 secondes (le téléchargement devrait avoir commencé)
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                    this.classList.remove('loading');
+                    this.style.pointerEvents = 'auto';
+                }, 3000);
+            });
+        });
+    </script>
+</body>
+</html>

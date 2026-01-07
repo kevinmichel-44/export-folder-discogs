@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connexion - Discogs Export</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="login-box">
+            <h1>🎵 Discogs Export</h1>
+            <p class="subtitle">Exportez vos dossiers Discogs en CSV</p>
+            
+            {% if error %}
+            <div class="error-message">
+                {{ error }}
+            </div>
+            {% endif %}
+            
+            <div class="oauth-section">
+                <p class="oauth-info">Connectez-vous de manière sécurisée avec votre compte Discogs</p>
+                <a href="{{ url_for('login') }}" class="btn-primary btn-oauth">
+                    🔐 Se connecter avec Discogs
+                </a>
+            </div>
+            
+            <div class="help-text">
+                <p><strong>Première utilisation ?</strong></p>
+                <ol>
+                    <li>Cliquez sur "Se connecter avec Discogs"</li>
+                    <li>Autorisez l'application à accéder à votre collection</li>
+                    <li>Vous serez redirigé automatiquement vers vos dossiers</li>
+                </ol>
+                <p class="note">⚠️ L'application nécessite une configuration OAuth. Consultez le README pour les instructions.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
