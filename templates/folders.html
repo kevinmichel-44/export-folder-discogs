@@ -1,61 +1,146 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mes dossiers - Discogs Export</title>
+    <title>Discogs Collection Export</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🎵 Mes dossiers Discogs</h1>
-            <div class="user-info">
-                <span>Connecté en tant que <strong>{{ username }}</strong></span>
-                <a href="{{ url_for('logout') }}" class="btn-secondary">Déconnexion</a>
-            </div>
-        </div>
-        
-        <div class="folders-grid">
-            {% for folder in folders %}
-            <div class="folder-card">
-                <div class="folder-header">
-                    <h2>{{ folder.name }}</h2>
-                    <span class="folder-count">{{ folder.count }} releases</span>
-                </div>
-                <div class="folder-actions">
-                    <a href="{{ url_for('export_folder', folder_id=folder.id) }}" class="btn-primary btn-download">
-                        📥 Télécharger CSV
-                    </a>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        
-        {% if not folders %}
-        <div class="empty-state">
-            <p>Aucun dossier trouvé dans votre collection.</p>
-        </div>
-        {% endif %}
+
+<header class="header">
+    <h1>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+        Discogs Collection Export
+    </h1>
+    <div class="user-info">
+        <span>Collection of <strong>{{ username }}</strong></span>
+        <a href="{{ url_for('logout') }}" class="btn-secondary">Logout</a>
     </div>
-    
-    <script>
-        // Afficher un message de chargement lors du téléchargement
-        document.querySelectorAll('.btn-download').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                const originalText = this.innerHTML;
-                this.innerHTML = '⏳ Export en cours...';
-                this.classList.add('loading');
-                this.style.pointerEvents = 'none';
-                
-                // Restaurer après 3 secondes (le téléchargement devrait avoir commencé)
-                setTimeout(() => {
-                    this.innerHTML = originalText;
-                    this.classList.remove('loading');
-                    this.style.pointerEvents = 'auto';
-                }, 3000);
-            });
-        });
-    </script>
+</header>
+
+<div class="container">
+
+    <section class="folders-grid">
+        {% for folder in folders %}
+        <article class="folder-card">
+
+            <div class="folder-header">
+                <h2>{{ folder.name }}</h2>
+                <span class="folder-count">{{ folder.count }} releases</span>
+            </div>
+
+            <div class="folder-actions">
+                <a href="{{ url_for('export_folder', folder_id=folder.id) }}"
+                   class="btn-primary btn-download"
+                   data-folder-id="{{ folder.id }}"
+                   data-folder-count="{{ folder.count }}">
+                    Export CSV
+                </a>
+            </div>
+
+            <!-- Progress -->
+            <div class="progress-container" id="progress-{{ folder.id }}" style="display:none;">
+                <div class="progress-info">
+                    <span class="progress-text">Preparing records…</span>
+                    <span class="progress-stats">
+                        <span class="current">0</span>/<span class="total">0</span>
+                    </span>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+
+                <div class="progress-time">
+                    ETA <span class="estimated-time">0</span>s
+                </div>
+            </div>
+
+        </article>
+        {% endfor %}
+    </section>
+
+    {% if not folders %}
+    <div class="empty-state">
+        No folders found in your Discogs collection.
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+document.querySelectorAll('.btn-download').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        const folderId = this.dataset.folderId;
+        const folderCount = parseInt(this.dataset.folderCount);
+        const progressContainer = document.getElementById('progress-' + folderId);
+        const button = this;
+
+        progressContainer.style.display = 'block';
+        button.style.display = 'none';
+
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = '/export/' + folderId;
+        document.body.appendChild(iframe);
+
+        setTimeout(() => {
+            const eventSource = new EventSource('/progress/' + folderId);
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                const fill = progressContainer.querySelector('.progress-fill');
+                const current = progressContainer.querySelector('.current');
+                const total = progressContainer.querySelector('.total');
+                const eta = progressContainer.querySelector('.estimated-time');
+                const text = progressContainer.querySelector('.progress-text');
+
+                if (data.status === 'starting') {
+                    text.textContent = 'Digging the crate…';
+                    total.textContent = folderCount;
+                }
+
+                if (data.status === 'processing') {
+                    text.textContent = 'Exporting records…';
+                    fill.style.width = data.percent + '%';
+                    current.textContent = data.current;
+                    total.textContent = data.total;
+                    eta.textContent = data.estimated_time;
+                }
+
+                if (data.status === 'completed') {
+                    text.textContent = 'Export ready';
+                    fill.style.width = '100%';
+                    eventSource.close();
+
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        button.style.display = 'block';
+                        fill.style.width = '0%';
+                        document.body.removeChild(iframe);
+                    }, 2500);
+                }
+
+                if (data.status === 'error') {
+                    text.textContent = 'Export failed';
+                    fill.style.background = 'var(--danger)';
+                    eventSource.close();
+                }
+            };
+        }, 500);
+    });
+});
+</script>
+
 </body>
 </html>

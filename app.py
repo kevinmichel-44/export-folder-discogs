@@ -1,14 +1,21 @@
-from flask import Flask, render_template, request, session, redirect, url_for, send_file
+from flask import Flask, render_template, request, session, redirect, url_for, send_file, Response, stream_with_context
 import discogs_client
 import csv
 import re
 import io
 import os
+import logging
+import json
+import time
 from datetime import timedelta
 from dotenv import load_dotenv
 
 # Charger les variables d'environnement
 load_dotenv()
+
+# Configurer les logs pour ignorer les erreurs SSL en dev
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
@@ -19,6 +26,9 @@ app.permanent_session_lifetime = timedelta(hours=2)
 CONSUMER_KEY = os.environ.get('DISCOGS_CONSUMER_KEY', '')
 CONSUMER_SECRET = os.environ.get('DISCOGS_CONSUMER_SECRET', '')
 CALLBACK_URL = os.environ.get('CALLBACK_URL', 'http://127.0.0.1:5000/callback')
+
+# Stockage temporaire pour la progression
+export_progress = {}
 
 
 @app.route('/')
@@ -138,6 +148,15 @@ def export_folder(folder_id):
     if 'access_token' not in session or 'access_secret' not in session:
         return redirect(url_for('index'))
     
+    # Initialiser la progression
+    export_id = f"{session.get('username', 'user')}_{folder_id}_{int(time.time())}"
+    export_progress[export_id] = {
+        'current': 0,
+        'total': 0,
+        'status': 'starting',
+        'folder_name': ''
+    }
+    
     try:
         d = discogs_client.Client('DiscogsExportApp/1.0')
         d.set_consumer_key(CONSUMER_KEY, CONSUMER_SECRET)
@@ -152,9 +171,18 @@ def export_folder(folder_id):
         for folder in collection_folders:
             if folder.id == folder_id:
                 folder_name = folder.name
+                total_releases = folder.count
+                
+                # Mettre à jour la progression
+                export_progress[export_id]['total'] = total_releases
+                export_progress[export_id]['folder_name'] = folder_name
+                export_progress[export_id]['status'] = 'processing'
                 
                 # Récupérer toutes les releases du dossier
-                for collection_item in folder.releases:
+                for idx, collection_item in enumerate(folder.releases, 1):
+                    # Mettre à jour la progression
+                    export_progress[export_id]['current'] = idx
+                    
                     release_id = collection_item.id
                     release = d.release(release_id)
                     
@@ -211,9 +239,9 @@ def export_folder(folder_id):
                         'price': price,
                         'url': release.url if hasattr(release, 'url') else ''
                     })
-                    
-                    # Log pour debug
-                    print(f"Exported: {artists_str} - {release.title} | Price: {price}")
+                
+                # Marquer comme terminé
+                export_progress[export_id]['status'] = 'completed'
                 break
         
         # Créer le fichier CSV en mémoire
@@ -232,6 +260,14 @@ def export_folder(folder_id):
         # Générer un nom de fichier sécurisé
         safe_filename = re.sub(r'[^\w\s-]', '', folder_name).strip().replace(' ', '_')
         
+        # Nettoyer la progression après un délai
+        def cleanup():
+            time.sleep(5)
+            export_progress.pop(export_id, None)
+        
+        import threading
+        threading.Thread(target=cleanup).start()
+        
         return send_file(
             bytes_output,
             mimetype='text/csv',
@@ -240,7 +276,75 @@ def export_folder(folder_id):
         )
         
     except Exception as e:
+        export_progress[export_id]['status'] = 'error'
+        export_progress[export_id]['error'] = str(e)
         return f"Erreur lors de l'export: {str(e)}", 500
+
+
+@app.route('/progress/<int:folder_id>')
+def progress(folder_id):
+    """Stream SSE pour la progression de l'export"""
+    def generate():
+        username = session.get('username', 'user')
+        
+        # Attendre que l'export démarre (max 10 secondes)
+        export_id = None
+        for _ in range(20):  # 20 * 0.5s = 10 secondes max
+            # Chercher l'export le plus récent pour ce dossier
+            for eid in list(export_progress.keys()):
+                if eid.startswith(f"{username}_{folder_id}_"):
+                    export_id = eid
+                    break
+            
+            if export_id:
+                break
+            
+            time.sleep(0.5)
+            yield f"data: {json.dumps({'status': 'waiting', 'message': 'En attente...'})}\n\n"
+        
+        if not export_id:
+            yield f"data: {json.dumps({'status': 'error', 'message': 'Export non trouvé'})}\n\n"
+            return
+        
+        # Streamer la progression
+        last_status = None
+        while True:
+            if export_id not in export_progress:
+                # L'export a été nettoyé, il est terminé
+                if last_status == 'completed':
+                    break
+                yield f"data: {json.dumps({'status': 'completed', 'current': 0, 'total': 0, 'percent': 100})}\n\n"
+                break
+            
+            progress_data = export_progress[export_id]
+            last_status = progress_data['status']
+            
+            # Calculer le temps estimé (environ 1.5 secondes par release)
+            if progress_data['total'] > 0 and progress_data['current'] > 0:
+                progress_percent = (progress_data['current'] / progress_data['total']) * 100
+                remaining = progress_data['total'] - progress_data['current']
+                estimated_time = int(remaining * 1.5)  # 1.5 secondes par release
+            else:
+                progress_percent = 0
+                estimated_time = int(progress_data.get('total', 0) * 1.5) if progress_data.get('total', 0) > 0 else 0
+            
+            data = {
+                'status': progress_data['status'],
+                'current': progress_data['current'],
+                'total': progress_data['total'],
+                'percent': round(progress_percent, 1),
+                'estimated_time': estimated_time,
+                'folder_name': progress_data['folder_name']
+            }
+            
+            yield f"data: {json.dumps(data)}\n\n"
+            
+            if progress_data['status'] in ['completed', 'error']:
+                break
+            
+            time.sleep(0.5)
+    
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
 
 
 @app.route('/logout')

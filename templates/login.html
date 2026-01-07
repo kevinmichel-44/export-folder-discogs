@@ -1,16 +1,25 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion - Discogs Export</title>
+    <title>Login - Discogs Export</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-    <div class="container">
+<body class="login-page">
+    <div class="login-container">
         <div class="login-box">
-            <h1>🎵 Discogs Export</h1>
-            <p class="subtitle">Exportez vos dossiers Discogs en CSV</p>
+            <div class="login-header">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo-large">
+                <h1>Discogs Collection Export</h1>
+            </div>
+            <p class="subtitle">Export your Discogs folders to CSV</p>
             
             {% if error %}
             <div class="error-message">
@@ -19,20 +28,19 @@
             {% endif %}
             
             <div class="oauth-section">
-                <p class="oauth-info">Connectez-vous de manière sécurisée avec votre compte Discogs</p>
+                <p class="oauth-info">Sign in securely with your Discogs account</p>
                 <a href="{{ url_for('login') }}" class="btn-primary btn-oauth">
-                    🔐 Se connecter avec Discogs
+                    🔐 Sign in with Discogs
                 </a>
             </div>
             
             <div class="help-text">
-                <p><strong>Première utilisation ?</strong></p>
+                <p><strong>First time using this?</strong></p>
                 <ol>
-                    <li>Cliquez sur "Se connecter avec Discogs"</li>
-                    <li>Autorisez l'application à accéder à votre collection</li>
-                    <li>Vous serez redirigé automatiquement vers vos dossiers</li>
+                    <li>Click "Sign in with Discogs"</li>
+                    <li>Authorize the application to access your collection</li>
+                    <li>You'll be automatically redirected to your folders</li>
                 </ol>
-                <p class="note">⚠️ L'application nécessite une configuration OAuth. Consultez le README pour les instructions.</p>
             </div>
         </div>
     </div>

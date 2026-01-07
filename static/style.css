@@ -4,162 +4,324 @@
     box-sizing: border-box;
 }
 
+/* =====================
+   THEME – VINYL SLEEVE
+   ===================== */
+
+:root {
+    --bg: #f4f1ec;
+    --card: #ffffff;
+    --border: #e4ded7;
+
+    --text: #1f2933;
+    --text-light: #6b7280;
+
+    --accent: #e5533d;
+    --accent-hover: #cc4835;
+
+    --success: #f2c94c;
+    --danger: #d14343;
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: 
+        linear-gradient(180deg, rgba(31, 41, 51, 0.7), rgba(31, 41, 51, 0.85)),
+        url('https://i.redd.it/vinyl-record-wallpapers-free-pack-in-comment-v0-ltovwpnfdv8c1.png?width=1441&format=png&auto=webp&s=8768d85e4f976a11ed3c42da04300cbfd1e8e95f');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+    color: var(--text);
     min-height: 100vh;
+    padding-top: 70px;
+}
+
+/* =====================
+   LAYOUT
+   ===================== */
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 48px 24px;
+}
+
+/* =====================
+   HEADER
+   ===================== */
+
+.header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 16px 32px;
+    border-bottom: 1px solid rgba(228, 222, 215, 0.5);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.1em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo {
+    height: 32px;
+    width: auto;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 0.85em;
+}
+
+/* =====================
+   BUTTONS
+   ===================== */
+
+.btn-primary {
+    display: block;
+    padding: 14px;
+    background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    border-radius: 4px;
+    transition: all .2s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 8px 16px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all .2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--accent);
+    color: white;
+}
+
+/* =====================
+   GRID
+   ===================== */
+
+.folders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 28px;
+}
+
+/* =====================
+   CARD
+   ===================== */
+
+.folder-card {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(250, 248, 246, 0.85));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(228, 222, 215, 0.5);
+    padding: 28px;
+    border-radius: 16px;
+    box-shadow: 0 12px 25px rgba(0,0,0,.08);
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+
+.folder-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(0,0,0,.15);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 248, 246, 0.9));
+}
+
+/* =====================
+   CARD HEADER
+   ===================== */
+
+.folder-header h2 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.15em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.folder-count {
+    display: inline-block;
+    background: var(--success);
+    color: #000;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75em;
+}
+
+/* =====================
+   PROGRESS
+   ===================== */
+
+.progress-container {
+    margin-top: 20px;
+    padding: 16px;
+    background: #faf8f6;
+    border: 1px dashed var(--border);
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Space Mono', 'Courier New', monospace;
+    font-size: 0.8em;
+    margin-bottom: 8px;
+}
+
+.progress-info::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+    background: url('https://media0.giphy.com/media/v1.Y2lkPTZjMDliOTUyN3RqZTNxc2l0Y2Z6Z3dibWNoY2xlMzJ3eWNzMzhxeTM2M3Npa2VleiZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/LNOZoHMI16ydtQ8bGG/giphy.gif') no-repeat center;
+    background-size: contain;
+}
+
+.progress-text {
+    display: flex;
+    align-items: center;
+}
+
+.progress-bar {
+    height: 6px;
+    background: #e5e0da;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--success));
+    transition: width .3s ease;
+}
+
+.progress-time {
+    text-align: right;
+    font-size: 0.75em;
+    color: var(--text-light);
+    margin-top: 6px;
+}
+
+/* =====================
+   EMPTY
+   ===================== */
+
+.empty-state {
+    text-align: center;
+    padding: 80px;
+    border: 1px dashed var(--border);
+    color: var(--text-light);
+}
+
+/* =====================
+   LOGIN PAGE
+   ===================== */
+
+.login-page {
+    padding-top: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 20px;
-    color: #333;
 }
 
-.container {
+.login-container {
     width: 100%;
-    max-width: 1200px;
-    margin: 0 auto;
+    max-width: 500px;
+    padding: 20px;
 }
 
-/* Page de connexion */
 .login-box {
-    background: white;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 248, 246, 0.9));
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(228, 222, 215, 0.5);
     padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
-    max-width: 450px;
-    margin: 0 auto;
+    border-radius: 16px;
+    box-shadow: 0 12px 25px rgba(0, 0, 0, 0.15);
+}
+
+.login-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 8px;
+}
+
+.logo-large {
+    height: 64px;
+    width: auto;
 }
 
 .login-box h1 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.8em;
+    font-weight: 600;
     text-align: center;
-    color: #667eea;
-    margin-bottom: 10px;
-    font-size: 2em;
+    color: var(--text);
+    margin: 0;
 }
 
 .subtitle {
     text-align: center;
-    color: #666;
-    margin-bottom: 30px;
+    color: var(--text-light);
+    margin-bottom: 32px;
     font-size: 0.95em;
 }
 
 .error-message {
-    background: #fee;
-    color: #c33;
-    padding: 12px;
-    border-radius: 6px;
-    margin-bottom: 20px;
-    border-left: 4px solid #c33;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: 500;
-    color: #444;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 12px 15px;
-    border: 2px solid #e0e0e0;
-    border-radius: 6px;
-    font-size: 1em;
-    transition: border-color 0.3s;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: #667eea;
-}
-
-.btn-primary {
-    width: 100%;
-    padding: 14px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: var(--danger);
     color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 1em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
-}
-
-.btn-primary:active {
-    transform: translateY(0);
-}
-
-.btn-secondary {
-    padding: 10px 20px;
-    background: white;
-    color: #667eea;
-    border: 2px solid #667eea;
-    border-radius: 6px;
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-bottom: 24px;
     font-size: 0.9em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s;
-    text-decoration: none;
-    display: inline-block;
 }
 
-.btn-secondary:hover {
-    background: #667eea;
-    color: white;
-}
-
-.help-text {
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 1px solid #e0e0e0;
-    font-size: 0.9em;
-    color: #666;
-}
-
-.help-text p {
-    margin-bottom: 10px;
-}
-
-.help-text ol {
-    margin-left: 20px;
-}
-
-.help-text li {
-    margin-bottom: 5px;
-}
-
-.help-text a {
-    color: #667eea;
-    text-decoration: none;
-}
-
-.help-text a:hover {
-    text-decoration: underline;
-}
-
-/* OAuth Section */
 .oauth-section {
     text-align: center;
-    margin: 30px 0;
+    margin: 32px 0;
 }
 
 .oauth-info {
-    color: #666;
+    color: var(--text-light);
     margin-bottom: 20px;
     font-size: 0.95em;
 }
@@ -167,133 +329,61 @@ body {
 .btn-oauth {
     display: inline-block;
     width: auto;
-    padding: 14px 30px;
-    font-size: 1.05em;
+    padding: 16px 40px;
+    font-size: 1em;
+}
+
+.help-text {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 0.9em;
+    color: var(--text-light);
+}
+
+.help-text p {
+    margin-bottom: 12px;
+}
+
+.help-text strong {
+    color: var(--text);
+}
+
+.help-text ol {
+    margin: 16px 0 16px 24px;
+    color: var(--text);
+}
+
+.help-text li {
+    margin-bottom: 8px;
 }
 
 .note {
-    margin-top: 15px;
-    padding: 10px;
-    background: #fff3cd;
-    border-left: 4px solid #ffc107;
-    color: #856404;
-    font-size: 0.9em;
+    margin-top: 20px;
+    padding: 14px 18px;
+    background: rgba(242, 201, 76, 0.15);
+    border-left: 3px solid var(--success);
+    color: var(--text);
+    font-size: 0.85em;
     border-radius: 4px;
 }
 
-/* Page des dossiers */
-.header {
-    background: white;
-    padding: 30px;
-    border-radius: 12px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-    margin-bottom: 30px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 20px;
-}
+/* =====================
+   RESPONSIVE
+   ===================== */
 
-.header h1 {
-    color: #667eea;
-    font-size: 2em;
-}
-
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.user-info span {
-    color: #666;
-}
-
-.folders-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 25px;
-}
-
-.folder-card {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s, box-shadow 0.3s;
-}
-
-.folder-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
-}
-
-.folder-header {
-    margin-bottom: 20px;
-}
-
-.folder-header h2 {
-    color: #333;
-    font-size: 1.5em;
-    margin-bottom: 10px;
-}
-
-.folder-count {
-    display: inline-block;
-    padding: 5px 12px;
-    background: #f0f0f0;
-    border-radius: 20px;
-    font-size: 0.9em;
-    color: #666;
-}
-
-.folder-actions {
-    margin-top: 15px;
-}
-
-.btn-download {
-    width: 100%;
-    padding: 12px;
-    font-size: 0.95em;
-}
-
-.btn-download.loading {
-    opacity: 0.7;
-    cursor: not-allowed;
-}
-
-.empty-state {
-    background: white;
-    padding: 60px 40px;
-    border-radius: 12px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
-    text-align: center;
-    color: #666;
-    font-size: 1.1em;
-}
-
-/* Responsive */
 @media (max-width: 768px) {
     .header {
         flex-direction: column;
+        gap: 16px;
         text-align: center;
     }
     
-    .header h1 {
-        font-size: 1.5em;
-    }
-    
-    .user-info {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .folders-grid {
-        grid-template-columns: 1fr;
-    }
-    
     .login-box {
-        padding: 30px 20px;
+        padding: 32px 24px;
+    }
+    
+    .login-box h1 {
+        font-size: 1.5em;
     }
 }
