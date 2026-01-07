@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   discogs-export:
-    image: ghcr.io/optiways/export-folder-discogs:latest
+    image: ghcr.io/kevinmichel-44/export-folder-discogs:latest
     container_name: discogs-export
     restart: unless-stopped
     ports:

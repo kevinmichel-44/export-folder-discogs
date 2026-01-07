@@ -119,7 +119,7 @@ docker build -t discogs-export .
 #### Utiliser l'image depuis GitHub Packages
 
 ```bash
-docker pull ghcr.io/optiways/export-folder-discogs:latest
+docker pull ghcr.io/kevinmichel-44/export-folder-discogs:latest
 ```
 
 ### Déploiement avec Docker Compose
