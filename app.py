@@ -430,7 +430,15 @@ def export_marketplace():
             # Process each listing
             for idx, listing in enumerate(for_sale_items, 1):
                 export_progress[export_id]['current'] = idx
-                print(f"[MARKETPLACE] Processing item {idx}/{total_items}")
+                
+                # Rate limiting - add delay every 50 items to avoid 429 errors
+                if idx > 1 and idx % 50 == 0:
+                    print(f"[MARKETPLACE] Rate limit pause at item {idx}...")
+                    time.sleep(2)
+                
+                # Log progress every 25 items
+                if idx % 25 == 0 or idx == 1:
+                    print(f"[MARKETPLACE] Processing item {idx}/{total_items}")
                 
                 try:
                     # Get release info first
@@ -514,8 +522,7 @@ def export_marketplace():
                                 posted = listing.data['posted']
                             else:
                                 posted = ''
-                    except Exception as e:
-                        print(f"[MARKETPLACE] Error with posted date: {str(e)}")
+                    except Exception:
                         posted = ''
                     
                     status = ''
@@ -565,7 +572,6 @@ def export_marketplace():
                         'status': status,
                         'url': url
                     })
-                    print(f"[MARKETPLACE] Successfully processed item {idx}")
                 except Exception as e:
                     print(f"[MARKETPLACE] Error processing listing {idx}: {str(e)}")
                     import traceback
