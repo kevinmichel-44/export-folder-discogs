@@ -155,19 +155,22 @@ def marketplace():
         me = d.identity()
         
         # Get marketplace inventory count
-        inventory = me.inventory
         total_items = 0
         try:
-            # Count total listings
-            for _ in inventory:
-                total_items += 1
-        except Exception:
+            inventory = list(me.inventory)
+            # Filter only items for sale (not sold)
+            for_sale_items = [item for item in inventory if hasattr(item, 'status') and item.status == 'For Sale']
+            total_items = len(for_sale_items)
+            print(f"Found {total_items} items for sale (out of {len(inventory)} total listings)")
+        except Exception as e:
+            print(f"Error counting inventory: {str(e)}")
             total_items = 0
         
         return render_template('marketplace.html', 
                              username=session.get('username', 'User'),
                              total_items=total_items)
     except Exception as e:
+        print(f"Marketplace error: {str(e)}")
         session.clear()
         return redirect(url_for('index'))
 
@@ -393,89 +396,186 @@ def export_marketplace():
     }
     
     try:
+        print(f"[MARKETPLACE] Starting export with ID: {export_id}")
         d = discogs_client.Client('DiscogsExportApp/1.0')
         d.set_consumer_key(CONSUMER_KEY, CONSUMER_SECRET)
         d.set_token(session['access_token'], session['access_secret'])
         me = d.identity()
         
-        # Get inventory
-        inventory = me.inventory
+        print(f"[MARKETPLACE] Getting inventory for user: {me.username}")
+        
+        # Get inventory - Convert to list first
+        try:
+            all_items = list(me.inventory)
+            # Filter only items for sale (not sold)
+            for_sale_items = [item for item in all_items if hasattr(item, 'status') and item.status == 'For Sale']
+            total_items = len(for_sale_items)
+            print(f"[MARKETPLACE] Found {total_items} items for sale (out of {len(all_items)} total listings)")
+        except Exception as inv_error:
+            print(f"[MARKETPLACE] Error getting inventory: {str(inv_error)}")
+            export_progress[export_id]['status'] = 'error'
+            export_progress[export_id]['error'] = f"Cannot access inventory: {str(inv_error)}"
+            return f"Error: {str(inv_error)}", 500
+        
         listings = []
         
-        # Count total items first
-        all_items = list(inventory)
-        total_items = len(all_items)
-        
-        export_progress[export_id]['total'] = total_items
-        export_progress[export_id]['status'] = 'processing'
-        
-        # Process each listing
-        for idx, listing in enumerate(all_items, 1):
-            export_progress[export_id]['current'] = idx
+        if total_items == 0:
+            print("[MARKETPLACE] No items for sale in inventory")
+            export_progress[export_id]['status'] = 'completed'
+            export_progress[export_id]['total'] = 0
+        else:
+            export_progress[export_id]['total'] = total_items
+            export_progress[export_id]['status'] = 'processing'
             
-            try:
-                release = listing.release
+            # Process each listing
+            for idx, listing in enumerate(for_sale_items, 1):
+                export_progress[export_id]['current'] = idx
+                print(f"[MARKETPLACE] Processing item {idx}/{total_items}")
                 
-                # Extract artists
-                artists = []
-                if hasattr(release, 'artists') and release.artists:
-                    for artist in release.artists:
-                        artist_filtered_name = re.sub(r'\(.*\)', '', artist.name)
-                        artists.append(artist_filtered_name)
-                
-                # Extract labels and catalog numbers
-                labels = []
-                catnos = []
-                if hasattr(release, 'labels') and release.labels:
-                    for label in release.labels:
-                        if hasattr(label, 'data'):
-                            label_name = label.data.get('name', 'Unknown')
-                            label_catno = label.data.get('catno', '')
-                        else:
-                            label_name = getattr(label, 'name', 'Unknown')
-                            label_catno = getattr(label, 'catno', '')
-                        
-                        label_filtered_name = re.sub(r'\(.*\)', '', label_name)
-                        labels.append(label_filtered_name)
-                        catnos.append(label_catno if label_catno else 'N/A')
-                
-                artists_str = ' - '.join(artists) if artists else 'Unknown Artist'
-                labels_str = ' - '.join(labels) if labels else 'Unknown Label'
-                catnos_str = ' , '.join(catnos) if catnos else 'N/A'
-                genres = ' , '.join(release.genres) if hasattr(release, 'genres') and release.genres else ''
-                styles = ' , '.join(release.styles) if hasattr(release, 'styles') and release.styles else ''
-                
-                # Listing details
-                listing_price = f"{listing.price.value} {listing.price.currency}" if hasattr(listing, 'price') else 'N/A'
-                condition = listing.condition if hasattr(listing, 'condition') else 'N/A'
-                sleeve_condition = listing.sleeve_condition if hasattr(listing, 'sleeve_condition') else 'N/A'
-                comments = listing.comments if hasattr(listing, 'comments') else ''
-                posted = listing.posted if hasattr(listing, 'posted') else ''
-                status = listing.status if hasattr(listing, 'status') else ''
-                
-                listings.append({
-                    'title': release.title if hasattr(release, 'title') else 'Unknown',
-                    'artists': artists_str,
-                    'labels': labels_str,
-                    'catno': catnos_str,
-                    'country': release.country if hasattr(release, 'country') else '',
-                    'year': release.year if hasattr(release, 'year') else '',
-                    'genres': genres,
-                    'styles': styles,
-                    'listing_price': listing_price,
-                    'condition': condition,
-                    'sleeve_condition': sleeve_condition,
-                    'comments': comments,
-                    'posted': posted,
-                    'status': status,
-                    'url': release.url if hasattr(release, 'url') else ''
-                })
-            except Exception as e:
-                # Skip problematic listings
-                continue
-        
-        # Mark as completed
-        export_progress[export_id]['status'] = 'completed'
+                try:
+                    # Get release info first
+                    try:
+                        release = listing.release
+                    except Exception as rel_error:
+                        print(f"[MARKETPLACE] Error getting release: {str(rel_error)}")
+                        continue
+                    
+                    # Extract artists
+                    artists = []
+                    try:
+                        if hasattr(release, 'artists') and release.artists:
+                            for artist in release.artists:
+                                artist_filtered_name = re.sub(r'\(.*\)', '', artist.name)
+                                artists.append(artist_filtered_name)
+                    except Exception:
+                        pass
+                    
+                    # Extract labels and catalog numbers
+                    labels = []
+                    catnos = []
+                    try:
+                        if hasattr(release, 'labels') and release.labels:
+                            for label in release.labels:
+                                if hasattr(label, 'data'):
+                                    label_name = label.data.get('name', 'Unknown')
+                                    label_catno = label.data.get('catno', '')
+                                else:
+                                    label_name = getattr(label, 'name', 'Unknown')
+                                    label_catno = getattr(label, 'catno', '')
+                                
+                                label_filtered_name = re.sub(r'\(.*\)', '', label_name)
+                                labels.append(label_filtered_name)
+                                catnos.append(label_catno if label_catno else 'N/A')
+                    except Exception:
+                        pass
+                    
+                    artists_str = ' - '.join(artists) if artists else 'Unknown Artist'
+                    labels_str = ' - '.join(labels) if labels else 'Unknown Label'
+                    catnos_str = ' , '.join(catnos) if catnos else 'N/A'
+                    
+                    try:
+                        genres = ' , '.join(release.genres) if hasattr(release, 'genres') and release.genres else ''
+                        styles = ' , '.join(release.styles) if hasattr(release, 'styles') and release.styles else ''
+                    except Exception:
+                        genres = ''
+                        styles = ''
+                    
+                    # Listing details - extract each field individually
+                    listing_price = 'N/A'
+                    try:
+                        if hasattr(listing, 'price') and listing.price:
+                            listing_price = f"{listing.price.value} {listing.price.currency}"
+                    except Exception:
+                        pass
+                    
+                    condition = 'N/A'
+                    try:
+                        condition = listing.condition if hasattr(listing, 'condition') else 'N/A'
+                    except Exception:
+                        pass
+                    
+                    sleeve_condition = 'N/A'
+                    try:
+                        sleeve_condition = listing.sleeve_condition if hasattr(listing, 'sleeve_condition') else 'N/A'
+                    except Exception:
+                        pass
+                    
+                    comments = ''
+                    try:
+                        comments = listing.comments if hasattr(listing, 'comments') else ''
+                    except Exception:
+                        pass
+                    
+                    posted = ''
+                    try:
+                        if hasattr(listing, 'posted'):
+                            # Access the raw data to avoid datetime parsing issues
+                            if hasattr(listing, 'data') and 'posted' in listing.data:
+                                posted = listing.data['posted']
+                            else:
+                                posted = ''
+                    except Exception as e:
+                        print(f"[MARKETPLACE] Error with posted date: {str(e)}")
+                        posted = ''
+                    
+                    status = ''
+                    try:
+                        status = listing.status if hasattr(listing, 'status') else ''
+                    except Exception:
+                        pass
+                    
+                    title = 'Unknown'
+                    try:
+                        title = release.title if hasattr(release, 'title') else 'Unknown'
+                    except Exception:
+                        pass
+                    
+                    country = ''
+                    try:
+                        country = release.country if hasattr(release, 'country') else ''
+                    except Exception:
+                        pass
+                    
+                    year = ''
+                    try:
+                        year = release.year if hasattr(release, 'year') else ''
+                    except Exception:
+                        pass
+                    
+                    url = ''
+                    try:
+                        url = release.url if hasattr(release, 'url') else ''
+                    except Exception:
+                        pass
+                    
+                    listings.append({
+                        'title': title,
+                        'artists': artists_str,
+                        'labels': labels_str,
+                        'catno': catnos_str,
+                        'country': country,
+                        'year': year,
+                        'genres': genres,
+                        'styles': styles,
+                        'listing_price': listing_price,
+                        'condition': condition,
+                        'sleeve_condition': sleeve_condition,
+                        'comments': comments,
+                        'posted': posted,
+                        'status': status,
+                        'url': url
+                    })
+                    print(f"[MARKETPLACE] Successfully processed item {idx}")
+                except Exception as e:
+                    print(f"[MARKETPLACE] Error processing listing {idx}: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+                    # Skip problematic listings
+                    continue
+            
+            # Mark as completed
+            export_progress[export_id]['status'] = 'completed'
+            print(f"[MARKETPLACE] Export completed with {len(listings)} listings")
         
         # Create CSV in memory
         output = io.StringIO()
@@ -507,6 +607,9 @@ def export_marketplace():
         )
         
     except Exception as e:
+        print(f"[MARKETPLACE] Critical error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         export_progress[export_id]['status'] = 'error'
         export_progress[export_id]['error'] = str(e)
         return f"Export error: {str(e)}", 500
