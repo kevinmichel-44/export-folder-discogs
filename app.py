@@ -142,6 +142,36 @@ def folders():
         return redirect(url_for('index'))
 
 
+@app.route('/marketplace')
+def marketplace():
+    """Display user's marketplace inventory"""
+    if 'access_token' not in session or 'access_secret' not in session:
+        return redirect(url_for('index'))
+    
+    try:
+        d = discogs_client.Client('DiscogsExportApp/1.0')
+        d.set_consumer_key(CONSUMER_KEY, CONSUMER_SECRET)
+        d.set_token(session['access_token'], session['access_secret'])
+        me = d.identity()
+        
+        # Get marketplace inventory count
+        inventory = me.inventory
+        total_items = 0
+        try:
+            # Count total listings
+            for _ in inventory:
+                total_items += 1
+        except Exception:
+            total_items = 0
+        
+        return render_template('marketplace.html', 
+                             username=session.get('username', 'User'),
+                             total_items=total_items)
+    except Exception as e:
+        session.clear()
+        return redirect(url_for('index'))
+
+
 @app.route('/export/<int:folder_id>')
 def export_folder(folder_id):
     """Export d'un dossier en CSV"""
@@ -324,6 +354,207 @@ def progress(folder_id):
                 progress_percent = (progress_data['current'] / progress_data['total']) * 100
                 remaining = progress_data['total'] - progress_data['current']
                 estimated_time = int(remaining * 1.5)  # 1.5 secondes par release
+            else:
+                progress_percent = 0
+                estimated_time = int(progress_data.get('total', 0) * 1.5) if progress_data.get('total', 0) > 0 else 0
+            
+            data = {
+                'status': progress_data['status'],
+                'current': progress_data['current'],
+                'total': progress_data['total'],
+                'percent': round(progress_percent, 1),
+                'estimated_time': estimated_time,
+                'folder_name': progress_data['folder_name']
+            }
+            
+            yield f"data: {json.dumps(data)}\n\n"
+            
+            if progress_data['status'] in ['completed', 'error']:
+                break
+            
+            time.sleep(0.5)
+    
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+
+@app.route('/export_marketplace')
+def export_marketplace():
+    """Export marketplace inventory to CSV"""
+    if 'access_token' not in session or 'access_secret' not in session:
+        return redirect(url_for('index'))
+    
+    # Initialize progress
+    export_id = f"{session.get('username', 'user')}_marketplace_{int(time.time())}"
+    export_progress[export_id] = {
+        'current': 0,
+        'total': 0,
+        'status': 'starting',
+        'folder_name': 'Marketplace'
+    }
+    
+    try:
+        d = discogs_client.Client('DiscogsExportApp/1.0')
+        d.set_consumer_key(CONSUMER_KEY, CONSUMER_SECRET)
+        d.set_token(session['access_token'], session['access_secret'])
+        me = d.identity()
+        
+        # Get inventory
+        inventory = me.inventory
+        listings = []
+        
+        # Count total items first
+        all_items = list(inventory)
+        total_items = len(all_items)
+        
+        export_progress[export_id]['total'] = total_items
+        export_progress[export_id]['status'] = 'processing'
+        
+        # Process each listing
+        for idx, listing in enumerate(all_items, 1):
+            export_progress[export_id]['current'] = idx
+            
+            try:
+                release = listing.release
+                
+                # Extract artists
+                artists = []
+                if hasattr(release, 'artists') and release.artists:
+                    for artist in release.artists:
+                        artist_filtered_name = re.sub(r'\(.*\)', '', artist.name)
+                        artists.append(artist_filtered_name)
+                
+                # Extract labels and catalog numbers
+                labels = []
+                catnos = []
+                if hasattr(release, 'labels') and release.labels:
+                    for label in release.labels:
+                        if hasattr(label, 'data'):
+                            label_name = label.data.get('name', 'Unknown')
+                            label_catno = label.data.get('catno', '')
+                        else:
+                            label_name = getattr(label, 'name', 'Unknown')
+                            label_catno = getattr(label, 'catno', '')
+                        
+                        label_filtered_name = re.sub(r'\(.*\)', '', label_name)
+                        labels.append(label_filtered_name)
+                        catnos.append(label_catno if label_catno else 'N/A')
+                
+                artists_str = ' - '.join(artists) if artists else 'Unknown Artist'
+                labels_str = ' - '.join(labels) if labels else 'Unknown Label'
+                catnos_str = ' , '.join(catnos) if catnos else 'N/A'
+                genres = ' , '.join(release.genres) if hasattr(release, 'genres') and release.genres else ''
+                styles = ' , '.join(release.styles) if hasattr(release, 'styles') and release.styles else ''
+                
+                # Listing details
+                listing_price = f"{listing.price.value} {listing.price.currency}" if hasattr(listing, 'price') else 'N/A'
+                condition = listing.condition if hasattr(listing, 'condition') else 'N/A'
+                sleeve_condition = listing.sleeve_condition if hasattr(listing, 'sleeve_condition') else 'N/A'
+                comments = listing.comments if hasattr(listing, 'comments') else ''
+                posted = listing.posted if hasattr(listing, 'posted') else ''
+                status = listing.status if hasattr(listing, 'status') else ''
+                
+                listings.append({
+                    'title': release.title if hasattr(release, 'title') else 'Unknown',
+                    'artists': artists_str,
+                    'labels': labels_str,
+                    'catno': catnos_str,
+                    'country': release.country if hasattr(release, 'country') else '',
+                    'year': release.year if hasattr(release, 'year') else '',
+                    'genres': genres,
+                    'styles': styles,
+                    'listing_price': listing_price,
+                    'condition': condition,
+                    'sleeve_condition': sleeve_condition,
+                    'comments': comments,
+                    'posted': posted,
+                    'status': status,
+                    'url': release.url if hasattr(release, 'url') else ''
+                })
+            except Exception as e:
+                # Skip problematic listings
+                continue
+        
+        # Mark as completed
+        export_progress[export_id]['status'] = 'completed'
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        csv_columns = ['title', 'artists', 'labels', 'catno', 'country', 'year', 'genres', 'styles', 
+                      'listing_price', 'condition', 'sleeve_condition', 'comments', 'posted', 'status', 'url']
+        writer = csv.DictWriter(output, fieldnames=csv_columns)
+        writer.writeheader()
+        for data in listings:
+            writer.writerow(data)
+        
+        # Convert to bytes
+        output.seek(0)
+        bytes_output = io.BytesIO(output.getvalue().encode('utf-8'))
+        bytes_output.seek(0)
+        
+        # Cleanup progress after delay
+        def cleanup():
+            time.sleep(5)
+            export_progress.pop(export_id, None)
+        
+        import threading
+        threading.Thread(target=cleanup).start()
+        
+        return send_file(
+            bytes_output,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'marketplace_inventory_export.csv'
+        )
+        
+    except Exception as e:
+        export_progress[export_id]['status'] = 'error'
+        export_progress[export_id]['error'] = str(e)
+        return f"Export error: {str(e)}", 500
+
+
+@app.route('/progress_marketplace')
+def progress_marketplace():
+    """SSE stream for marketplace export progress"""
+    def generate():
+        username = session.get('username', 'user')
+        
+        # Wait for export to start (max 10 seconds)
+        export_id = None
+        for _ in range(20):  # 20 * 0.5s = 10 seconds max
+            # Find most recent marketplace export
+            for eid in list(export_progress.keys()):
+                if eid.startswith(f"{username}_marketplace_"):
+                    export_id = eid
+                    break
+            
+            if export_id:
+                break
+            
+            time.sleep(0.5)
+            yield f"data: {json.dumps({'status': 'waiting', 'message': 'Waiting...'})}\n\n"
+        
+        if not export_id:
+            yield f"data: {json.dumps({'status': 'error', 'message': 'Export not found'})}\n\n"
+            return
+        
+        # Stream progress
+        last_status = None
+        while True:
+            if export_id not in export_progress:
+                # Export cleaned up, it's completed
+                if last_status == 'completed':
+                    break
+                yield f"data: {json.dumps({'status': 'completed', 'current': 0, 'total': 0, 'percent': 100})}\n\n"
+                break
+            
+            progress_data = export_progress[export_id]
+            last_status = progress_data['status']
+            
+            # Calculate estimated time (about 1.5 seconds per listing)
+            if progress_data['total'] > 0 and progress_data['current'] > 0:
+                progress_percent = (progress_data['current'] / progress_data['total']) * 100
+                remaining = progress_data['total'] - progress_data['current']
+                estimated_time = int(remaining * 1.5)
             else:
                 progress_percent = 0
                 estimated_time = int(progress_data.get('total', 0) * 1.5) if progress_data.get('total', 0) > 0 else 0
