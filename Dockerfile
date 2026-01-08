@@ -20,11 +20,12 @@ COPY run.py .
 COPY app/ app/
 COPY scripts/ scripts/
 
-# Créer les répertoires nécessaires
-RUN mkdir -p data/dumps logs
-
 # Créer un utilisateur non-root pour la sécurité
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+RUN useradd -m -u 1000 appuser
+
+# Créer les répertoires nécessaires et donner les permissions
+RUN mkdir -p data/dumps logs && chown -R appuser:appuser /app
+
 USER appuser
 
 # Exposer le port 5000
