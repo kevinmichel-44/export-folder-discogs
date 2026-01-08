@@ -53,22 +53,24 @@ def get_latest_dump_url(dump_type, year_month=None):
     
     Args:
         dump_type: One of 'artists', 'labels', 'masters', 'releases'
-        year_month: Optional specific year-month (e.g., '2026/') to use
+        year_month: Optional specific year (e.g., '2026') to use
     
     Returns:
         tuple: (url, filename) or (None, None) if not found
     """
     config = DUMP_TYPES[dump_type]
     
-    # Try current month by default
+    # Try current year by default
     if year_month is None:
         now = datetime.now()
-        year_month = f"{now.year}/{now.strftime('%m')}"
+        year_month = str(now.year)
+    
+    # Remove any slashes from year_month
+    year = year_month.replace('/', '')
     
     # Build expected filename (e.g., discogs_20260101_artists.xml.gz)
-    date_str = year_month.replace('/', '')
-    filename = f"{config['prefix']}{date_str}01{config['suffix']}"
-    url = f"{S3_BASE_URL}/{year_month}/{filename}"
+    filename = f"{config['prefix']}{year}0101{config['suffix']}"
+    url = f"{S3_BASE_URL}/{year}/{filename}"
     
     print(f"[{dump_type.upper()}] Checking URL: {url}")
     
@@ -536,7 +538,7 @@ def main():
                         default=['artists', 'labels', 'masters', 'releases'],
                         help='Dump types to import (default: all)')
     parser.add_argument('--year-month', type=str,
-                        help='Specific year-month to download (e.g., "2026/01")')
+                        help='Specific year to download (e.g., "2026")')
     parser.add_argument('--limit', type=int,
                         help='Limit number of records to import per dump (for testing)')
     parser.add_argument('--skip-download', action='store_true',
