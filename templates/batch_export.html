@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Export - Discogs Collection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .batch-info {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 4px;
+        }
+        .batch-info h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .batch-info ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+        .batch-info li {
+            margin: 0.3rem 0;
+        }
+        .cache-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+            color: #856404;
+        }
+        .batch-controls {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        .batch-controls label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+        .batch-controls input,
+        .batch-controls select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .stat-label {
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+        .job-list {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .job-item {
+            padding: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+        .job-item:last-child {
+            border-bottom: none;
+        }
+        .job-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        .job-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        .job-status.running { background: #d1ecf1; color: #0c5460; }
+        .job-status.completed { background: #d4edda; color: #155724; }
+        .job-status.failed { background: #f8d7da; color: #721c24; }
+        .job-status.cancelled { background: #e2e3e5; color: #383d41; }
+        .job-actions {
+            margin-top: 0.5rem;
+        }
+        .job-actions button,
+        .job-actions a {
+            margin-right: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <h1>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+        Batch Export - Optimisé
+    </h1>
+    <nav class="header-nav">
+        <a href="{{ url_for('folders') }}" class="nav-link">Collection</a>
+        <a href="{{ url_for('marketplace') }}" class="nav-link">Marketplace</a>
+        <a href="{{ url_for('import_cache_page') }}" class="nav-link">⚡ Import Cache</a>
+        <a href="{{ url_for('batch.batch_list') }}" class="nav-link active">🚀 Batch Export</a>
+    </nav>
+    <div class="user-info">
+        <span>Connected as <strong>{{ username }}</strong></span>
+        {% if cache_stats %}
+        <span class="cache-info" title="Releases in cache">📦 {{ cache_stats.total_cached }} cached</span>
+        {% endif %}
+        <a href="{{ url_for('logout') }}" class="btn-secondary">Logout</a>
+    </div>
+</header>
+
+<div class="container">
+
+    <div class="batch-info">
+        <h3>🚀 Export Optimisé avec Worker Pool</h3>
+        <p>Ce système utilise un <strong>Token Bucket Algorithm</strong> et un <strong>Worker Pool</strong> pour accélérer les exports :</p>
+        <ul>
+            <li>✅ <strong>Parallélisation intelligente</strong> : Les releases en cache sont lues en parallèle (pas de rate limit)</li>
+            <li>✅ <strong>Token Bucket</strong> : Gestion fluide du rate limiting (60 req/min) au lieu de délais fixes</li>
+            <li>✅ <strong>Retry automatique</strong> : Backoff exponentiel en cas d'erreur API</li>
+            <li>✅ <strong>Statistiques en temps réel</strong> : Cache hits, API calls, vitesse d'export</li>
+        </ul>
+    </div>
+
+    {% if cache_stats and cache_stats.total_cached == 0 %}
+    <div class="cache-warning">
+        ⚠️ <strong>Cache vide</strong> - Tous les appels seront faits à l'API Discogs. 
+        Pour tester les performances optimales, pré-chargez le cache via <a href="{{ url_for('import_cache_page') }}">Import Cache</a>.
+    </div>
+    {% endif %}
+
+    <section class="batch-controls">
+        <h2>Lancer un Export</h2>
+        
+        <label for="folder-select">Sélectionnez un dossier :</label>
+        <select id="folder-select">
+            <option value="">-- Choisir un dossier --</option>
+            {% for folder in folders %}
+            <option value="{{ folder.id }}" data-count="{{ folder.count }}">
+                {{ folder.name }} ({{ folder.count }} releases)
+            </option>
+            {% endfor %}
+        </select>
+
+        <label for="num-workers">Nombre de workers (1-5) :</label>
+        <input type="number" id="num-workers" min="1" max="5" value="3">
+        <small style="display:block; margin-top:-0.5rem; margin-bottom:1rem; color:#666;">
+            Recommandé : 3 workers. Plus de workers = plus rapide pour le cache, mais pas pour l'API (rate limited).
+        </small>
+
+        <button class="btn-primary" id="start-export" disabled>
+            🚀 Démarrer l'Export Optimisé
+        </button>
+    </section>
+
+    <section id="export-progress" style="display:none;">
+        <h2>Export en cours...</h2>
+        
+        <div class="stats-grid" id="stats-display">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-completed">0</div>
+                <div class="stat-label">Completed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-cache-hits">0</div>
+                <div class="stat-label">Cache Hits</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-api-calls">0</div>
+                <div class="stat-label">API Calls</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-failed">0</div>
+                <div class="stat-label">Failed</div>
+            </div>
+        </div>
+
+        <div class="progress-container">
+            <div class="progress-info">
+                <span class="progress-text" id="progress-message">Initializing...</span>
+                <span class="progress-stats">
+                    <span class="current" id="progress-current">0</span>/<span class="total" id="progress-total">0</span>
+                </span>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+
+            <div class="progress-time">
+                ETA <span class="estimated-time" id="eta">0</span>s
+            </div>
+        </div>
+
+        <button class="btn-secondary" id="cancel-export" style="margin-top:1rem;">
+            ❌ Annuler l'export
+        </button>
+    </section>
+
+    <section style="margin-top:2rem;">
+        <h2>Historique des Exports</h2>
+        <div class="job-list" id="job-list">
+            <p style="padding:1rem; text-align:center; color:#999;">Aucun export pour le moment</p>
+        </div>
+    </section>
+
+</div>
+
+<script>
+const folderSelect = document.getElementById('folder-select');
+const numWorkersInput = document.getElementById('num-workers');
+const startButton = document.getElementById('start-export');
+const exportProgress = document.getElementById('export-progress');
+const jobList = document.getElementById('job-list');
+
+let currentBatchId = null;
+let eventSource = null;
+
+// Enable start button when folder selected
+folderSelect.addEventListener('change', function() {
+    startButton.disabled = !this.value;
+});
+
+// Start export
+startButton.addEventListener('click', async function() {
+    const folderId = folderSelect.value;
+    const numWorkers = parseInt(numWorkersInput.value);
+    
+    if (!folderId) return;
+
+    try {
+        const response = await fetch(`/batch/export/${folderId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ num_workers: numWorkers })
+        });
+
+        const data = await response.json();
+        
+        if (data.batch_id) {
+            currentBatchId = data.batch_id;
+            startButton.disabled = true;
+            folderSelect.disabled = true;
+            numWorkersInput.disabled = true;
+            exportProgress.style.display = 'block';
+            
+            // Connect to SSE for progress
+            connectToProgress(data.batch_id);
+            
+            // Refresh job list
+            loadJobList();
+        } else {
+            alert('Erreur: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        alert('Erreur: ' + error.message);
+    }
+});
+
+// Cancel export
+document.getElementById('cancel-export').addEventListener('click', async function() {
+    if (!currentBatchId) return;
+    
+    try {
+        await fetch(`/batch/cancel/${currentBatchId}`, { method: 'POST' });
+        disconnectProgress();
+        resetExportUI();
+    } catch (error) {
+        console.error('Cancel error:', error);
+    }
+});
+
+// Connect to SSE progress stream
+function connectToProgress(batchId) {
+    eventSource = new EventSource(`/batch/progress/${batchId}`);
+    
+    eventSource.addEventListener('progress', function(e) {
+        const data = JSON.parse(e.data);
+        updateProgress(data);
+    });
+    
+    eventSource.addEventListener('complete', function(e) {
+        const data = JSON.parse(e.data);
+        updateProgress(data);
+        
+        // Show download button
+        setTimeout(() => {
+            if (confirm('Export terminé ! Télécharger le CSV ?')) {
+                window.location.href = `/batch/download/${batchId}`;
+            }
+            resetExportUI();
+            loadJobList();
+        }, 500);
+    });
+    
+    eventSource.addEventListener('error', function(e) {
+        console.error('SSE error:', e);
+        disconnectProgress();
+        alert('Erreur lors de l\'export');
+        resetExportUI();
+        loadJobList();
+    });
+}
+
+// Disconnect SSE
+function disconnectProgress() {
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+    }
+}
+
+// Update progress UI
+function updateProgress(data) {
+    document.getElementById('stat-completed').textContent = data.completed || 0;
+    document.getElementById('stat-cache-hits').textContent = data.cache_hits || 0;
+    document.getElementById('stat-api-calls').textContent = data.api_calls || 0;
+    document.getElementById('stat-failed').textContent = data.failed || 0;
+    
+    document.getElementById('progress-current').textContent = data.completed || 0;
+    document.getElementById('progress-total').textContent = data.total || 0;
+    document.getElementById('progress-message').textContent = data.message || 'Processing...';
+    document.getElementById('eta').textContent = Math.round(data.eta || 0);
+    
+    if (data.total > 0) {
+        const percent = (data.completed / data.total) * 100;
+        document.getElementById('progress-fill').style.width = percent + '%';
+    }
+}
+
+// Reset UI
+function resetExportUI() {
+    currentBatchId = null;
+    startButton.disabled = false;
+    folderSelect.disabled = false;
+    numWorkersInput.disabled = false;
+    exportProgress.style.display = 'none';
+    folderSelect.value = '';
+    disconnectProgress();
+}
+
+// Load job list
+async function loadJobList() {
+    try {
+        const response = await fetch('/batch/list/json');
+        const data = await response.json();
+        
+        if (data.jobs && data.jobs.length > 0) {
+            jobList.innerHTML = data.jobs.map(job => `
+                <div class="job-item">
+                    <div class="job-header">
+                        <strong>Folder ${job.folder_id}</strong>
+                        <span class="job-status ${job.status}">${job.status}</span>
+                    </div>
+                    <div style="font-size:0.875rem; color:#666;">
+                        Started: ${new Date(job.started_at * 1000).toLocaleString()} | 
+                        ${job.completed}/${job.total} releases | 
+                        Cache: ${job.cache_hits} | API: ${job.api_calls}
+                        ${job.completed_at ? ` | Duration: ${Math.round(job.completed_at - job.started_at)}s` : ''}
+                    </div>
+                    <div class="job-actions">
+                        ${job.status === 'completed' ? `
+                            <a href="/batch/download/${job.batch_id}" class="btn-primary">📥 Download CSV</a>
+                        ` : ''}
+                        ${job.status === 'running' ? `
+                            <button class="btn-secondary" onclick="cancelJob('${job.batch_id}')">❌ Cancel</button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            jobList.innerHTML = '<p style="padding:1rem; text-align:center; color:#999;">Aucun export pour le moment</p>';
+        }
+    } catch (error) {
+        console.error('Error loading job list:', error);
+    }
+}
+
+// Cancel job from list
+async function cancelJob(batchId) {
+    if (!confirm('Annuler cet export ?')) return;
+    
+    try {
+        await fetch(`/batch/cancel/${batchId}`, { method: 'POST' });
+        loadJobList();
+    } catch (error) {
+        console.error('Cancel error:', error);
+    }
+}
+
+// Load job list on page load
+loadJobList();
+
+// Refresh job list every 10 seconds
+setInterval(loadJobList, 10000);
+</script>
+
+</body>
+</html>

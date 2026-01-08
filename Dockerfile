@@ -1,19 +1,27 @@
-# Utiliser Python 3.11 slim pour une image légère
-FROM python:3.11-slim
+# Utiliser Python 3.13 slim pour une image légère
+FROM python:3.13-slim
 
 # Définir le répertoire de travail
 WORKDIR /app
 
+# Installer les dépendances système pour PostgreSQL
+RUN apt-get update && apt-get install -y \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copier les fichiers de dépendances
 COPY requirements.txt .
 
-# Installer les dépendances
+# Installer les dépendances Python
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copier le code de l'application
-COPY app.py .
-COPY templates/ templates/
-COPY static/ static/
+# Copier le code de l'application (nouvelle structure)
+COPY run.py .
+COPY app/ app/
+COPY scripts/ scripts/
+
+# Créer les répertoires nécessaires
+RUN mkdir -p data/dumps logs
 
 # Créer un utilisateur non-root pour la sécurité
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
@@ -23,8 +31,8 @@ USER appuser
 EXPOSE 5000
 
 # Variables d'environnement par défaut
-ENV FLASK_APP=app.py
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 # Commande de démarrage avec gunicorn pour la production
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "600", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "600", "--access-logfile", "-", "--error-logfile", "-", "run:app"]

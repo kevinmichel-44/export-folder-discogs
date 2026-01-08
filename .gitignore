@@ -30,3 +30,9 @@ Thumbs.db
 
 # CSV exports
 *.csv
+
+# Obsolete files
+obso/
+
+# Local database files
+discogs_cache.db

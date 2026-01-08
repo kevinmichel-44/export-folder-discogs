@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discogs Marketplace Export</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="header">
+    <h1>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+        Discogs Collection Export
+    </h1>
+    <nav class="header-nav">
+        <a href="{{ url_for('folders') }}" class="nav-link">Collection</a>
+        <a href="{{ url_for('marketplace') }}" class="nav-link active">Marketplace</a>
+    </nav>
+    <div class="user-info">
+        <span>Collection of <strong>{{ username }}</strong></span>
+        <a href="{{ url_for('logout') }}" class="btn-secondary">Logout</a>
+    </div>
+</header>
+
+<div class="container">
+
+    <section class="folders-grid">
+        <article class="folder-card">
+
+            <div class="folder-header">
+                <h2>My Marketplace Inventory</h2>
+                <span class="folder-count">{{ total_items }} items for sale</span>
+            </div>
+
+            <div class="folder-actions">
+                <a href="{{ url_for('export_marketplace') }}"
+                   class="btn-primary btn-download"
+                   data-folder-id="marketplace"
+                   data-folder-count="{{ total_items }}">
+                    Export CSV
+                </a>
+            </div>
+
+            <!-- Progress -->
+            <div class="progress-container" id="progress-marketplace" style="display:none;">
+                <div class="progress-info">
+                    <span class="progress-text">Preparing records…</span>
+                    <span class="progress-stats">
+                        <span class="current">0</span>/<span class="total">0</span>
+                    </span>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+
+                <div class="progress-time">
+                    ETA <span class="estimated-time">0</span>s
+                </div>
+            </div>
+
+        </article>
+    </section>
+
+    {% if total_items == 0 %}
+    <div class="empty-state">
+        No items currently listed in your marketplace inventory.
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+document.querySelectorAll('.btn-download').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        const folderId = this.dataset.folderId;
+        const folderCount = parseInt(this.dataset.folderCount);
+        const progressContainer = document.getElementById('progress-marketplace');
+        const button = this;
+
+        progressContainer.style.display = 'block';
+        button.style.display = 'none';
+
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.src = '/export_marketplace';
+        document.body.appendChild(iframe);
+
+        setTimeout(() => {
+            const eventSource = new EventSource('/progress_marketplace');
+            let lastPercent = 0;
+            let isCompleted = false;
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                const fill = progressContainer.querySelector('.progress-fill');
+                const current = progressContainer.querySelector('.current');
+                const total = progressContainer.querySelector('.total');
+                const eta = progressContainer.querySelector('.estimated-time');
+                const text = progressContainer.querySelector('.progress-text');
+
+                if (data.status === 'starting') {
+                    text.textContent = 'Loading inventory…';
+                    total.textContent = folderCount;
+                }
+
+                if (data.status === 'processing') {
+                    text.textContent = 'Exporting listings…';
+                    fill.style.width = data.percent + '%';
+                    current.textContent = data.current;
+                    total.textContent = data.total;
+                    eta.textContent = data.estimated_time;
+                    lastPercent = data.percent;
+                }
+
+                if (data.status === 'completed') {
+                    text.textContent = 'Export ready';
+                    fill.style.width = '100%';
+                    isCompleted = true;
+                    eventSource.close();
+
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        button.style.display = 'block';
+                        fill.style.width = '0%';
+                        document.body.removeChild(iframe);
+                    }, 2500);
+                }
+
+                if (data.status === 'error') {
+                    text.textContent = 'Export failed';
+                    fill.style.background = 'var(--danger)';
+                    eventSource.close();
+                }
+            };
+
+            eventSource.onerror = function(error) {
+                // Don't show error if export is still in progress
+                if (!isCompleted && lastPercent > 0 && lastPercent < 100) {
+                    console.log('SSE connection lost, but export may still be running...');
+                    const text = progressContainer.querySelector('.progress-text');
+                    text.textContent = 'Export in progress (connection lost)…';
+                } else if (!isCompleted) {
+                    const text = progressContainer.querySelector('.progress-text');
+                    const fill = progressContainer.querySelector('.progress-fill');
+                    text.textContent = 'Export failed';
+                    fill.style.background = 'var(--danger)';
+                }
+                eventSource.close();
+            };
+        }, 500);
+    });
+});
+</script>
+
+</body>
+</html>

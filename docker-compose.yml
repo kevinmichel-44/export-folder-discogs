@@ -1,10 +1,33 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: discogs_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: discogs_cache
+      POSTGRES_USER: discogs
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-discogs_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U discogs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - discogs_network
+
   discogs-export:
     image: ghcr.io/kevinmichel-44/export-folder-discogs:latest
     container_name: discogs-export
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "5000:5000"
     environment:
@@ -13,11 +36,14 @@ services:
       - DISCOGS_CONSUMER_SECRET=${DISCOGS_CONSUMER_SECRET}
       - CALLBACK_URL=${CALLBACK_URL:-http://localhost:5000/callback}
       - SECRET_KEY=${SECRET_KEY}
+      # Database PostgreSQL
+      - DATABASE_URL=postgresql://discogs:${POSTGRES_PASSWORD:-discogs_password}@postgres:5432/discogs_cache
     volumes:
       # Optionnel : pour persister les données si nécessaire
       - ./data:/app/data
     networks:
       - web
+      - discogs_network
     labels:
       # Labels pour Traefik (optionnel)
       - "traefik.enable=true"
@@ -26,6 +52,12 @@ services:
       - "traefik.http.routers.discogs-export.tls.certresolver=letsencrypt"
       - "traefik.http.services.discogs-export.loadbalancer.server.port=5000"
 
+volumes:
+  postgres_data:
+    driver: local
+
 networks:
   web:
     external: true
+  discogs_network:
+    driver: bridge
