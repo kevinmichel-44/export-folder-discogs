@@ -574,8 +574,15 @@ def main():
         print(f"Limit per dump: {args.limit:,} records")
     print()
     
-    # Initialize database
-    db_manager = DatabaseManager(f'sqlite:///{args.db_path}')
+    # Initialize database - use DATABASE_URL from env or fallback to db-path
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        database_url = f'sqlite:///{args.db_path}'
+    
+    print(f"Database: {database_url.split('@')[0]}@..." if '@' in database_url else f"Database: {database_url}")
+    print()
+    
+    db_manager = DatabaseManager(database_url)
     db_manager.init_db()
     
     # Import order: artists, labels, masters, releases
