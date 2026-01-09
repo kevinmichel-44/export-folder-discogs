@@ -143,7 +143,11 @@ def parse_artists_dump(filepath, db_manager, limit=None):
     count = 0
     skipped = 0
     batch = []
-    batch_size = 1000
+    batch_size = 5000
+    
+    # Désactiver autoflush pour plus de performance
+    session.autoflush = False
+    session.autocommit = False
     
     try:
         with gzip.open(filepath, 'rt', encoding='utf-8') as f:
@@ -233,7 +237,11 @@ def parse_labels_dump(filepath, db_manager, limit=None):
     count = 0
     skipped = 0
     batch = []
-    batch_size = 1000
+    batch_size = 5000
+    
+    # Désactiver autoflush pour plus de performance
+    session.autoflush = False
+    session.autocommit = False
     
     try:
         with gzip.open(filepath, 'rt', encoding='utf-8') as f:
@@ -324,7 +332,11 @@ def parse_masters_dump(filepath, db_manager, limit=None):
     count = 0
     skipped = 0
     batch = []
-    batch_size = 1000
+    batch_size = 5000
+    
+    # Désactiver autoflush pour plus de performance
+    session.autoflush = False
+    session.autocommit = False
     
     try:
         with gzip.open(filepath, 'rt', encoding='utf-8') as f:
@@ -425,7 +437,11 @@ def parse_releases_dump(filepath, db_manager, limit=None):
     count = 0
     skipped = 0
     batch = []
-    batch_size = 1000
+    batch_size = 5000  # Augmenté de 1000 à 5000
+    
+    # Désactiver autoflush et autocommit pour plus de performance
+    session.autoflush = False
+    session.autocommit = False
     
     try:
         with gzip.open(filepath, 'rt', encoding='utf-8') as f:
@@ -543,6 +559,8 @@ def main():
                         help='Limit number of records to import per dump (for testing)')
     parser.add_argument('--skip-download', action='store_true',
                         help='Skip download if files already exist')
+    parser.add_argument('--skip-duplicates-check', action='store_true',
+                        help='Skip checking for existing records (faster for first import)')
     parser.add_argument('--db-path', type=str, default='discogs_cache.db',
                         help='Path to SQLite database')
     
